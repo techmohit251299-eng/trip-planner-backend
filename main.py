@@ -1,21 +1,3 @@
-"""
-Trip Planner Backend - FastAPI + Claude API
---------------------------------------------
-This backend takes destination, budget, days, and selected activities,
-sends a prompt to Claude, and returns a real AI-generated itinerary.
-
-SETUP (on Replit):
-1. Create a new Python repl.
-2. Paste this code into main.py
-3. In the Replit "Secrets" tab (lock icon on the left sidebar), add:
-     key: ANTHROPIC_API_KEY
-     value: <your key from console.anthropic.com>
-4. In the Shell tab, run: pip install fastapi uvicorn anthropic
-5. Click Run.
-6. Replit will give you a live URL (something like https://trip-planner-backend.<username>.repl.co)
-   Use that URL in the frontend HTML's fetch() call.
-"""
-
 import os
 import json
 from fastapi import FastAPI, HTTPException
@@ -26,7 +8,6 @@ import anthropic
 
 app = FastAPI()
 
-# Allow the frontend HTML (running anywhere) to call this backend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,7 +22,7 @@ class TripRequest(BaseModel):
     destination: str
     budget: float
     days: int
-    activities: List[str]  # e.g. ["rafting", "heritage", "foodwalk"]
+    activities: List[str]
 
 
 @app.get("/")
@@ -85,7 +66,6 @@ Respond ONLY with valid JSON in this exact structure, no other text:
         )
         raw_text = message.content[0].text.strip()
 
-        # Clean up in case the model wraps it in markdown code fences
         if raw_text.startswith("```"):
             raw_text = raw_text.strip("`")
             if raw_text.startswith("json"):
