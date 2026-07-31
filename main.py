@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
-import anthropic
+import google.generativeai as genai
 
 app = FastAPI()
 
@@ -15,7 +15,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+
+model = genai.GenerativeModel("gemini-2.5-flash")
 
 
 class TripRequest(BaseModel):
@@ -27,13 +31,13 @@ class TripRequest(BaseModel):
 
 @app.get("/")
 def health_check():
-    return {"status": "Trip Planner backend is running"}
+    return {"status": "Trip Planner backend is running (Gemini)"}
 
 
 @app.post("/generate-trip")
 def generate_trip(req: TripRequest):
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not set in Secrets")
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set in Secrets")
 
     activities_text = ", ".join(req.activities) if req.activities else "a good general mix"
 
@@ -50,7 +54,7 @@ For each day, provide:
 Also provide an overall budget breakdown across these 4 categories: stay, food, travel, activities
 (as approximate percentages that add up to 100).
 
-Respond ONLY with valid JSON in this exact structure, no other text:
+Respond ONLY with valid JSON in this exact structure, no other text, no markdown code fences:
 {{
   "budget_breakdown": {{"stay": 35, "food": 20, "travel": 20, "activities": 25}},
   "days": [
@@ -59,12 +63,8 @@ Respond ONLY with valid JSON in this exact structure, no other text:
 }}"""
 
     try:
-        message = client.messages.create(
-            model="claude-sonnet-5",
-            max_tokens=1500,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw_text = message.content[0].text.strip()
+        response = model.generate_content(prompt)
+        raw_text = response.text.strip()
 
         if raw_text.startswith("```"):
             raw_text = raw_text.strip("`")
@@ -75,6 +75,6 @@ Respond ONLY with valid JSON in this exact structure, no other text:
         return parsed
 
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Claude returned invalid JSON. Try again.")
+        raise HTTPException(status_code=500, detail="Gemini returned invalid JSON. Try again.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
